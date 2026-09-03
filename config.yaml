@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# IDS Configuration
+# ---------------------------------------------------------------------------
+
+network:
+  interface: "enp1s0"           # NIC to sniff on (use `ip link` / `ifconfig` to list)
+  bpf_filter: "ip"             # Berkeley Packet Filter, e.g. "tcp or udp"
+  flow_timeout_sec: 30         # idle time before a flow is flushed/finalized
+  flow_flush_interval_sec: 5   # how often the flow table is scanned for timeouts
+
+host:
+  enabled: true
+  log_paths:
+    - "/var/log/auth.log"      # Debian/Ubuntu SSH/auth log
+    - "/var/log/secure"        # RHEL/CentOS equivalent (only one will exist)
+  poll_interval_sec: 2
+
+detection:
+  signature_rules_path: "rules/rules.yaml"
+  ml_model_path: "models/anomaly_model.joblib"
+  ml_scaler_path: "models/scaler.joblib"
+  ml_score_threshold: -0.15    # lower (more negative) = more anomalous, tune after training
+  ml_min_packets_for_eval: 4   # don't score flows with too few packets, too noisy
+
+alerts:
+  log_file: "alerts.log"
+  console: true
+  dedup_window_sec: 60         # suppress identical repeat alerts within this window

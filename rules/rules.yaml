@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------------------
+# Signature rules
+#
+# Two rule families:
+#   network_rules  -> evaluated against per-flow / per-window traffic stats
+#   host_rules     -> evaluated against parsed host log lines
+#
+# Add new rules without touching engine code where possible.
+# ---------------------------------------------------------------------------
+
+network_rules:
+  - id: "NET-001"
+    name: "Port scan detected"
+    description: "Single source touching many distinct destination ports in a short window"
+    type: "port_scan"
+    window_sec: 10
+    unique_ports_threshold: 15
+    severity: "high"
+
+  - id: "NET-002"
+    name: "SYN flood suspected"
+    description: "Abnormally high rate of SYN packets from a single source"
+    type: "syn_flood"
+    window_sec: 5
+    syn_count_threshold: 100
+    severity: "critical"
+
+  - id: "NET-003"
+    name: "ICMP flood suspected"
+    description: "Abnormally high rate of ICMP echo requests from a single source"
+    type: "icmp_flood"
+    window_sec: 5
+    icmp_count_threshold: 200
+    severity: "high"
+
+  - id: "NET-004"
+    name: "Known malicious port contacted"
+    description: "Traffic seen to a port commonly associated with malware C2 / backdoors"
+    type: "blacklisted_port"
+    ports: [4444, 31337, 6666, 1337]
+    severity: "medium"
+
+host_rules:
+  - id: "HOST-001"
+    name: "Repeated failed SSH logins (brute force)"
+    description: "Same source IP fails authentication multiple times within window"
+    type: "failed_login_burst"
+    pattern: "Failed password for"
+    ip_regex: "from\\s+(\\d+\\.\\d+\\.\\d+\\.\\d+)"
+    window_sec: 60
+    count_threshold: 5
+    severity: "high"
+
+  - id: "HOST-002"
+    name: "Successful login after failed burst"
+    description: "Login succeeded from an IP that recently triggered a failed-login burst"
+    type: "login_after_burst"
+    pattern: "Accepted password for"
+    ip_regex: "from\\s+(\\d+\\.\\d+\\.\\d+\\.\\d+)"
+    correlate_with: "HOST-001"
+    correlate_window_sec: 120
+    severity: "critical"
+
+  - id: "HOST-003"
+    name: "New user account created"
+    description: "Possible unauthorized account creation (persistence)"
+    type: "pattern_match"
+    pattern: "new user"
+    severity: "medium"
