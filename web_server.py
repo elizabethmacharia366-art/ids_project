@@ -25,35 +25,36 @@ app = Flask(
     static_folder=os.path.join(os.path.dirname(__file__), "web", "static"),
 )
 
-LOG_FILE = "alerts.log"
-FLOW_TABLE_REF = None
-
-
-def set_flow_table(flow_table):
-    """Register flow table reference for live flow metrics API."""
-    global FLOW_TABLE_REF
-    FLOW_TABLE_REF = flow_table
+def get_log_paths():
+    """Return potential log file paths (local and Vercel /tmp fallback)."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    local_log = os.path.join(base_dir, "alerts.log")
+    tmp_log = "/tmp/alerts.log"
+    return [tmp_log, local_log]
 
 
 def read_alerts_from_log():
     """Read and parse alert records from the alerts.log file."""
     alerts = []
-    if not os.path.exists(LOG_FILE):
-        return alerts
+    seen_lines = set()
 
-    try:
-        with open(LOG_FILE, "r", encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    record = json.loads(line)
-                    alerts.append(record)
-                except json.JSONDecodeError:
-                    continue
-    except Exception as e:
-        log.error("Failed reading alert log: %s", e)
+    for path in get_log_paths():
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line in seen_lines:
+                        continue
+                    seen_lines.add(line)
+                    try:
+                        record = json.loads(line)
+                        alerts.append(record)
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            log.error("Failed reading alert log at %s: %s", path, e)
 
     return alerts
 
@@ -216,23 +217,33 @@ def simulate_alert():
         "message": selected["message"].replace("192.168.1.105", fake_ip),
     }
 
-    try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record) + "\n")
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    written = False
+    for path in reversed(get_log_paths()):
+        try:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record) + "\n")
+            written = True
+            break
+        except Exception:
+            continue
+
+    if not written:
+        return jsonify({"status": "error", "message": "Could not write log to any location"}), 500
 
     return jsonify({"status": "success", "alert": record})
 
 
 @app.route("/api/alerts/clear", methods=["POST"])
 def clear_alerts():
-    """Clear all records from alerts.log."""
-    try:
-        open(LOG_FILE, "w").close()
-        return jsonify({"status": "success", "message": "Alert log cleared"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    """Clear all records from alerts log locations."""
+    for path in get_log_paths():
+        if os.path.exists(path):
+            try:
+                open(path, "w").close()
+            except Exception:
+                pass
+    return jsonify({"status": "success", "message": "Alert log cleared"})
+
 
 
 def run_web_server(host="0.0.0.0", port=5000):
