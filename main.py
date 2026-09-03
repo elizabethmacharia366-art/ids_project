@@ -23,7 +23,8 @@ from core.log_monitor import LogTailer
 from detection.signature_engine import SignatureEngine
 from detection.ml_engine import AnomalyEngine
 from alerts.alert_manager import AlertManager
-from web_server import run_web_server, set_flow_table
+from web_server import app, application, handler, run_web_server, set_flow_table
+
 
 logging.basicConfig(
     level=logging.INFO,

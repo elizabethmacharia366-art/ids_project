@@ -1,2 +1,2 @@
 [tool.vercel]
-entrypoint = "web_server:app"
+entrypoint = "main:app"
