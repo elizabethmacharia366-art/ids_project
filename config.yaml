@@ -26,3 +26,9 @@ alerts:
   log_file: "alerts.log"
   console: true
   dedup_window_sec: 60         # suppress identical repeat alerts within this window
+
+web:
+  enabled: true
+  host: "0.0.0.0"
+  port: 5000
+

@@ -2,6 +2,7 @@ import logging
 import signal
 import sys
 import time
+import threading
 
 import yaml
 
@@ -11,6 +12,7 @@ from core.log_monitor import LogTailer
 from detection.signature_engine import SignatureEngine
 from detection.ml_engine import AnomalyEngine
 from alerts.alert_manager import AlertManager
+from web_server import run_web_server, set_flow_table
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +22,7 @@ log = logging.getLogger("ids.main")
 
 
 def load_config(path="config.yaml"):
+    """Load configuration options from a YAML file."""
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
@@ -49,6 +52,7 @@ def main():
                      "Signature detection still active. See train_model.py.")
 
     flow_table = FlowTable()
+    set_flow_table(flow_table)
 
     def on_expired_flow(flow):
         is_anom, score = ml_engine.score_flow(flow)
@@ -82,6 +86,18 @@ def main():
         log_tailer.start()
         log.info("Host log monitor started.")
 
+    # Start Web Dashboard Server (if enabled)
+    if cfg.get("web", {}).get("enabled", True):
+        web_host = cfg["web"].get("host", "0.0.0.0")
+        web_port = cfg["web"].get("port", 5000)
+        web_thread = threading.Thread(
+            target=run_web_server,
+            kwargs={"host": web_host, "port": web_port},
+            daemon=True,
+        )
+        web_thread.start()
+        log.info("Web Dashboard UI running at http://%s:%d", web_host, web_port)
+
     def shutdown(*_):
         log.info("Shutting down...")
         capture.stop()
@@ -99,3 +115,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
