@@ -1,6 +1,16 @@
 """Web Server & REST API Backend for the IDS Security Dashboard."""
 
 import os
+import sys
+
+# Auto-reexec with local virtual environment Python if dependencies missing
+try:
+    import flask
+except ImportError:
+    venv_python = os.path.join(os.path.dirname(os.path.abspath(__file__)), "venv", "bin", "python")
+    if os.path.exists(venv_python) and os.path.abspath(sys.executable) != os.path.abspath(venv_python):
+        os.execv(venv_python, [venv_python] + sys.argv)
+
 import json
 import random
 import time
